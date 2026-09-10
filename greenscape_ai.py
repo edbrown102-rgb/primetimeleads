@@ -53,10 +53,10 @@ class LeadCRMService:
         address_lower = lead.address.lower()
         for contractor in contractors:
             area_match = any(area.lower() in address_lower for area in contractor.service_areas)
+            if not area_match:
+                continue
             specialty_set = {s.lower() for s in contractor.specialties}
             specialty_matches = sum(1 for svc in lead.requested_services if svc.lower() in specialty_set)
-            if not area_match and specialty_matches == 0:
-                continue
             score = (20 if area_match else 0) + specialty_matches * 15 - contractor.active_jobs * 2
             ranked.append((score, contractor))
 
@@ -112,6 +112,7 @@ class Invoice:
     due_date: date
     recurring_interval_days: int | None = None
     paid: bool = False
+    paid_at: date | None = None
 
 
 class BillingService:
@@ -131,12 +132,14 @@ class BillingService:
         if invoice.paid or amount < invoice.amount_due:
             return False
         invoice.paid = True
+        invoice.paid_at = date.today()
         return True
 
     def next_recurring_invoice_date(self, invoice: Invoice) -> date | None:
         if invoice.recurring_interval_days is None:
             return None
-        return invoice.due_date + timedelta(days=invoice.recurring_interval_days)
+        anchor_date = invoice.paid_at or invoice.due_date
+        return anchor_date + timedelta(days=invoice.recurring_interval_days)
 
 
 # ---------- Customer Portal ----------
@@ -153,6 +156,7 @@ class ServiceRequest:
 class CustomerPortalService:
     def __init__(self) -> None:
         self.service_requests: List[ServiceRequest] = []
+        self.service_history: List[str] = []
 
     def approve_proposal(self, proposal: Proposal, customer_signature: str) -> str:
         return f"approved:{proposal.id}:{customer_signature.strip()}"
@@ -163,10 +167,11 @@ class CustomerPortalService:
     def request_service(self, customer_id: str, service_type: str, preferred_date: date, notes: str = "") -> ServiceRequest:
         request = ServiceRequest(customer_id=customer_id, service_type=service_type, preferred_date=preferred_date, notes=notes)
         self.service_requests.append(request)
+        self.service_history.append(f"Requested {service_type} for {preferred_date.isoformat()}")
         return request
 
-    def view_service_history(self, history: Sequence[str]) -> List[str]:
-        return list(history)
+    def view_service_history(self) -> List[str]:
+        return list(self.service_history)
 
 
 # ---------- Contractor Dashboard ----------
@@ -311,7 +316,7 @@ class EquipmentManagementService:
         reminders = []
         for task, interval in self.maintenance_intervals.items():
             next_due = equipment.last_service_hours.get(task, 0.0) + interval
-            if next_due <= equipment.runtime_hours < next_due + 5:
+            if equipment.runtime_hours >= next_due:
                 reminders.append(task)
         return reminders
 
@@ -354,7 +359,7 @@ class EstimationService:
     def plant_quantity(self, bed_square_feet: float, spacing_feet: float) -> int:
         if spacing_feet <= 0:
             return 0
-        return max(0, int(bed_square_feet / (spacing_feet * spacing_feet)))
+        return max(0, ceil(bed_square_feet / (spacing_feet * spacing_feet)))
 
     def mowing_time_hours(self, square_feet: float, mower_sqft_per_hour: float = 12000) -> float:
         if square_feet <= 0 or mower_sqft_per_hour <= 0:

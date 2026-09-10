@@ -69,6 +69,12 @@ class GreenScapeAITests(unittest.TestCase):
         self.assertTrue(platform.weather.should_delay_service(weather))
         self.assertEqual(platform.weather.grass_growth_rate(weather), "fast")
 
+        mild = WeatherSnapshot(rain_probability=0.2, heat_index=88, storm_alert=False, rainfall_inches_week=0.2, average_temp_f=72)
+        self.assertFalse(platform.weather.should_delay_service(mild))
+
+        cool = WeatherSnapshot(rain_probability=0.1, heat_index=60, storm_alert=False, rainfall_inches_week=0.3, average_temp_f=50)
+        self.assertEqual(platform.weather.grass_growth_rate(cool), "slow")
+
         estimator = EstimationService()
         self.assertEqual(estimator.mulch_cubic_yards(540, 3), 5.0)
         self.assertEqual(estimator.mulch_cubic_yards(-10, 3), 0.0)
@@ -77,6 +83,7 @@ class GreenScapeAITests(unittest.TestCase):
         self.assertEqual(estimator.mowing_time_hours(-100), 0.0)
         self.assertEqual(estimator.sod_area_rolls(101, 10.5), 10)
         self.assertEqual(estimator.sod_area_rolls(101, 0), 0)
+        self.assertEqual(estimator.plant_quantity(101, 10), 2)
         self.assertEqual(estimator.labor_cost(-1, 45, 2), 0)
         self.assertEqual(estimator.labor_cost(2, -5, 3), 0)
         self.assertEqual(estimator.labor_cost(2, 25, -2), 0)
@@ -87,6 +94,8 @@ class GreenScapeAITests(unittest.TestCase):
         platform.equipment.add_runtime(mower, 3)
         reminders = platform.equipment.service_reminders(mower)
         self.assertIn("oil change", reminders)
+        mower.runtime_hours = 70
+        self.assertIn("oil change", platform.equipment.service_reminders(mower))
 
         platform.equipment.log_maintenance(mower, "Oil change complete", 35, task="oil change")
         self.assertEqual(mower.total_cost, 35)
@@ -104,8 +113,8 @@ class GreenScapeAITests(unittest.TestCase):
         request = platform.customer_portal.request_service("cust_2", "fertilizer", date.today(), "Backyard only")
         self.assertEqual(request.service_type, "fertilizer")
         self.assertEqual(len(platform.customer_portal.service_requests), 1)
-        history = platform.customer_portal.view_service_history(["Mowing - complete", "Mulch refresh - complete"])
-        self.assertEqual(len(history), 2)
+        history = platform.customer_portal.view_service_history()
+        self.assertEqual(len(history), 1)
 
 
 if __name__ == "__main__":
