@@ -350,7 +350,7 @@ class TermsAgreementService:
 
     def sign(self, customer_id: str, terms: str) -> str:
         payload = f"{customer_id}:{terms}".encode("utf-8")
-        digest = hmac.new(self.signing_secret, payload, sha256).hexdigest()[:12]
+        digest = hmac.new(self.signing_secret, payload, sha256).hexdigest()
         return f"sig_{customer_id}_{digest}"
 
 
