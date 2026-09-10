@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
+from hashlib import sha256
 from math import radians, sin, cos, asin, sqrt
 from typing import Dict, Iterable, List, Sequence, Tuple
 from uuid import uuid4
@@ -52,7 +53,8 @@ class LeadCRMService:
         address_lower = lead.address.lower()
         for contractor in contractors:
             area_match = any(area.lower() in address_lower for area in contractor.service_areas)
-            specialty_matches = sum(1 for svc in lead.requested_services if svc.lower() in {s.lower() for s in contractor.specialties})
+            specialty_set = {s.lower() for s in contractor.specialties}
+            specialty_matches = sum(1 for svc in lead.requested_services if svc.lower() in specialty_set)
             if not area_match and specialty_matches == 0:
                 continue
             score = (20 if area_match else 0) + specialty_matches * 15 - contractor.active_jobs * 2
@@ -278,6 +280,7 @@ class Equipment:
     maintenance_log: List[str] = field(default_factory=list)
     total_cost: float = 0.0
     warranty_expires_on: date | None = None
+    last_service_hours: Dict[str, float] = field(default_factory=dict)
 
 
 class EquipmentManagementService:
@@ -294,11 +297,16 @@ class EquipmentManagementService:
     def log_maintenance(self, equipment: Equipment, entry: str, cost: float = 0.0) -> None:
         equipment.maintenance_log.append(entry)
         equipment.total_cost = round(equipment.total_cost + max(cost, 0), 2)
+        normalized = entry.lower()
+        for task in self.maintenance_intervals:
+            if task in normalized:
+                equipment.last_service_hours[task] = equipment.runtime_hours
 
     def service_reminders(self, equipment: Equipment) -> List[str]:
         reminders = []
         for task, interval in self.maintenance_intervals.items():
-            if equipment.runtime_hours > 0 and equipment.runtime_hours % interval <= 5:
+            next_due = equipment.last_service_hours.get(task, 0.0) + interval
+            if next_due <= equipment.runtime_hours < next_due + 5:
                 reminders.append(task)
         return reminders
 
@@ -319,7 +327,8 @@ class TermsAgreementService:
         return "\n".join(self.templates[t] for t in agreement_types if t in self.templates)
 
     def sign(self, customer_id: str, terms: str) -> str:
-        return f"sig_{customer_id}_{abs(hash(terms)) % 1_000_000}"
+        digest = sha256(f"{customer_id}:{terms}".encode("utf-8")).hexdigest()[:12]
+        return f"sig_{customer_id}_{digest}"
 
 
 # ---------- Material & Labor Estimation ----------

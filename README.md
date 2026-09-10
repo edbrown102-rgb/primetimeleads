@@ -17,11 +17,11 @@ GreenScape AI is a modular lawn-care and landscaping SaaS foundation focused on 
 
 ## Code structure
 
-- `/home/runner/work/primetimeleads/primetimeleads/greenscape_ai.py` contains production-oriented service modules and shared models.
-- `/home/runner/work/primetimeleads/primetimeleads/test_greenscape_ai.py` contains focused unit tests for core module behavior.
+- `greenscape_ai.py` contains production-oriented service modules and shared models.
+- `test_greenscape_ai.py` contains focused unit tests for core module behavior.
 
 ## Run tests
 
 ```bash
-python -m unittest -v /home/runner/work/primetimeleads/primetimeleads/test_greenscape_ai.py
+python -m unittest -v test_greenscape_ai.py
 ```

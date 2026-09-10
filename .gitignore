@@ -1,3 +1,2 @@
 __pycache__/
 *.py[cod]
-EOF && git add .gitignore && git rm -r --cached __pycache__

@@ -77,8 +77,17 @@ class GreenScapeAITests(unittest.TestCase):
         platform.equipment.add_runtime(mower, 3)
         reminders = platform.equipment.service_reminders(mower)
         self.assertIn("oil change", reminders)
+
         platform.equipment.log_maintenance(mower, "Oil change complete", 35)
         self.assertEqual(mower.total_cost, 35)
+        self.assertNotIn("oil change", platform.equipment.service_reminders(mower))
+
+    def test_terms_signature_is_deterministic(self):
+        platform = GreenScapeAIPlatform()
+        terms = platform.terms.generate_terms(["lawn_care", "weather_delay"])
+        sig_a = platform.terms.sign("cust_1", terms)
+        sig_b = platform.terms.sign("cust_1", terms)
+        self.assertEqual(sig_a, sig_b)
 
     def test_customer_service_request_and_history(self):
         platform = GreenScapeAIPlatform()
