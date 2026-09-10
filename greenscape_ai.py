@@ -339,8 +339,13 @@ class TermsAgreementService:
         "recurring_service": "Recurring services renew monthly unless terminated in writing.",
     }
 
-    def __init__(self, signing_secret: str | None = None) -> None:
-        self.signing_secret = (signing_secret or uuid4().hex).encode("utf-8")
+    def __init__(self, signing_secret: str | bytes | None = None) -> None:
+        if signing_secret is None:
+            self.signing_secret = uuid4().hex.encode("utf-8")
+        elif isinstance(signing_secret, bytes):
+            self.signing_secret = signing_secret
+        else:
+            self.signing_secret = signing_secret.encode("utf-8")
 
     def generate_terms(self, agreement_types: Sequence[str]) -> str:
         unknown = [t for t in agreement_types if t not in self.templates]
