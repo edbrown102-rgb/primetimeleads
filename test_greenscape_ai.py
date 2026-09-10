@@ -32,7 +32,7 @@ class GreenScapeAITests(unittest.TestCase):
             lead,
             [
                 Contractor(id="C1", name="Crew A", service_areas=["Tampa"], specialties=["mowing"], active_jobs=1),
-                Contractor(id="C2", name="Crew B", service_areas=["Orlando"], specialties=["trees"], active_jobs=0),
+                Contractor(id="C2", name="Crew B", service_areas=["Orlando"], specialties=["mowing"], active_jobs=0),
             ],
         )
 
@@ -47,10 +47,17 @@ class GreenScapeAITests(unittest.TestCase):
             terms="Standard lawn terms",
         )
 
+        valid_signature = platform.terms.sign(proposal.customer_id, proposal.terms)
+        self.assertTrue(platform.customer_portal.approve_proposal(proposal, valid_signature).startswith("approved:"))
+        self.assertTrue(platform.customer_portal.approve_proposal(proposal, "bad-token").startswith("rejected:"))
+
         invoice = platform.billing.create_invoice(proposal, recurring_interval_days=30)
         self.assertEqual(invoice.amount_due, 300)
         self.assertEqual(platform.billing.next_recurring_invoice_date(invoice), invoice.due_date + timedelta(days=30))
+        self.assertFalse(platform.customer_portal.pay_invoice(platform.billing, invoice, 310))
         self.assertTrue(platform.customer_portal.pay_invoice(platform.billing, invoice, 300))
+        self.assertEqual(platform.billing.next_recurring_invoice_date(invoice), invoice.paid_at + timedelta(days=30))
+        self.assertFalse(platform.customer_portal.pay_invoice(platform.billing, invoice, 300))
 
     def test_yard_measurement_route_weather_and_estimation(self):
         platform = GreenScapeAIPlatform()
@@ -108,6 +115,8 @@ class GreenScapeAITests(unittest.TestCase):
         sig_a = platform.terms.sign("cust_1", terms)
         sig_b = platform.terms.sign("cust_1", terms)
         self.assertEqual(sig_a, sig_b)
+        with self.assertRaises(ValueError):
+            platform.terms.generate_terms(["unknown"])
 
     def test_customer_service_request_and_history(self):
         platform = GreenScapeAIPlatform()

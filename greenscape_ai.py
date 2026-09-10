@@ -64,9 +64,7 @@ class LeadCRMService:
         if not ranked:
             return None
 
-        best = max(ranked, key=lambda item: item[0])[1]
-        best.active_jobs += 1
-        return best
+        return max(ranked, key=lambda item: item[0])[1]
 
     def build_follow_up_sequence(self, lead: Lead) -> List[FollowUpTask]:
         base = lead.created_at
@@ -130,7 +128,9 @@ class BillingService:
         )
 
     def record_payment(self, invoice: Invoice, amount: float) -> bool:
-        if invoice.paid or amount <= 0 or amount != invoice.amount_due:
+        amount_cents = int(round(amount * 100))
+        due_cents = int(round(invoice.amount_due * 100))
+        if invoice.paid or amount_cents <= 0 or amount_cents != due_cents:
             return False
         invoice.paid = True
         invoice.paid_at = date.today()
@@ -155,14 +155,18 @@ class ServiceRequest:
 
 
 class CustomerPortalService:
-    def __init__(self) -> None:
+    def __init__(self, terms_service: "TermsAgreementService | None" = None) -> None:
+        self.terms_service = terms_service
         self.service_requests: List[ServiceRequest] = []
         self.service_history: List[str] = []
 
     def approve_proposal(self, proposal: Proposal, customer_signature: str) -> str:
-        if customer_signature.strip() != proposal.signature_token:
+        if self.terms_service is None:
             return f"rejected:{proposal.id}"
-        return f"approved:{proposal.id}:{proposal.signature_token}"
+        expected_signature = self.terms_service.sign(proposal.customer_id, proposal.terms)
+        if customer_signature.strip() != expected_signature:
+            return f"rejected:{proposal.id}"
+        return f"approved:{proposal.id}:{expected_signature}"
 
     def pay_invoice(self, billing: BillingService, invoice: Invoice, amount: float) -> bool:
         return billing.record_payment(invoice, amount)
@@ -340,7 +344,10 @@ class TermsAgreementService:
         self.signing_secret = (signing_secret or uuid4().hex).encode("utf-8")
 
     def generate_terms(self, agreement_types: Sequence[str]) -> str:
-        return "\n".join(self.templates[t] for t in agreement_types if t in self.templates)
+        unknown = [t for t in agreement_types if t not in self.templates]
+        if unknown:
+            raise ValueError(f"Unsupported agreement types: {unknown}")
+        return "\n".join(self.templates[t] for t in agreement_types)
 
     def sign(self, customer_id: str, terms: str) -> str:
         payload = f"{customer_id}:{terms}".encode("utf-8")
@@ -392,3 +399,6 @@ class GreenScapeAIPlatform:
     equipment: EquipmentManagementService = field(default_factory=EquipmentManagementService)
     terms: TermsAgreementService = field(default_factory=TermsAgreementService)
     estimation: EstimationService = field(default_factory=EstimationService)
+
+    def __post_init__(self) -> None:
+        self.customer_portal.terms_service = self.terms
