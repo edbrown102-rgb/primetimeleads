@@ -301,13 +301,11 @@ class EquipmentManagementService:
     def add_runtime(self, equipment: Equipment, hours: float) -> None:
         equipment.runtime_hours = round(equipment.runtime_hours + max(hours, 0), 2)
 
-    def log_maintenance(self, equipment: Equipment, entry: str, cost: float = 0.0) -> None:
+    def log_maintenance(self, equipment: Equipment, entry: str, cost: float = 0.0, task: str | None = None) -> None:
         equipment.maintenance_log.append(entry)
         equipment.total_cost = round(equipment.total_cost + max(cost, 0), 2)
-        normalized = entry.lower()
-        for task in self.maintenance_intervals:
-            if task in normalized:
-                equipment.last_service_hours[task] = equipment.runtime_hours
+        if task is not None and task in self.maintenance_intervals:
+            equipment.last_service_hours[task] = equipment.runtime_hours
 
     def service_reminders(self, equipment: Equipment) -> List[str]:
         reminders = []
@@ -343,6 +341,8 @@ class TermsAgreementService:
 
 class EstimationService:
     def mulch_cubic_yards(self, square_feet: float, depth_inches: float) -> float:
+        if square_feet <= 0 or depth_inches <= 0:
+            return 0.0
         cubic_feet = square_feet * (depth_inches / 12)
         return round(cubic_feet / 27, 2)
 
@@ -357,7 +357,7 @@ class EstimationService:
         return max(0, int(bed_square_feet / (spacing_feet * spacing_feet)))
 
     def mowing_time_hours(self, square_feet: float, mower_sqft_per_hour: float = 12000) -> float:
-        if mower_sqft_per_hour <= 0:
+        if square_feet <= 0 or mower_sqft_per_hour <= 0:
             return 0.0
         return round(square_feet / mower_sqft_per_hour, 2)
 

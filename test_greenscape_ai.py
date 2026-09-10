@@ -71,7 +71,10 @@ class GreenScapeAITests(unittest.TestCase):
 
         estimator = EstimationService()
         self.assertEqual(estimator.mulch_cubic_yards(540, 3), 5.0)
+        self.assertEqual(estimator.mulch_cubic_yards(-10, 3), 0.0)
+        self.assertEqual(estimator.mulch_cubic_yards(100, -1), 0.0)
         self.assertEqual(estimator.labor_cost(3.5, 45, 2), 315)
+        self.assertEqual(estimator.mowing_time_hours(-100), 0.0)
         self.assertEqual(estimator.sod_area_rolls(101, 10.5), 10)
         self.assertEqual(estimator.sod_area_rolls(101, 0), 0)
         self.assertEqual(estimator.labor_cost(-1, 45, 2), 0)
@@ -85,7 +88,7 @@ class GreenScapeAITests(unittest.TestCase):
         reminders = platform.equipment.service_reminders(mower)
         self.assertIn("oil change", reminders)
 
-        platform.equipment.log_maintenance(mower, "Oil change complete", 35)
+        platform.equipment.log_maintenance(mower, "Oil change complete", 35, task="oil change")
         self.assertEqual(mower.total_cost, 35)
         self.assertNotIn("oil change", platform.equipment.service_reminders(mower))
 
