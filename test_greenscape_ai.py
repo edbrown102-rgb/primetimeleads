@@ -56,7 +56,8 @@ class GreenScapeAITests(unittest.TestCase):
         self.assertEqual(platform.billing.next_recurring_invoice_date(invoice), invoice.due_date + timedelta(days=30))
         self.assertFalse(platform.customer_portal.pay_invoice(platform.billing, invoice, 310))
         self.assertTrue(platform.customer_portal.pay_invoice(platform.billing, invoice, 300))
-        self.assertEqual(platform.billing.next_recurring_invoice_date(invoice), invoice.paid_at + timedelta(days=30))
+        invoice.paid_at = invoice.due_date + timedelta(days=3)
+        self.assertEqual(platform.billing.next_recurring_invoice_date(invoice), invoice.due_date + timedelta(days=30))
         self.assertFalse(platform.customer_portal.pay_invoice(platform.billing, invoice, 300))
 
     def test_yard_measurement_route_weather_and_estimation(self):
@@ -64,8 +65,9 @@ class GreenScapeAITests(unittest.TestCase):
 
         area = platform.yard_measurement.polygon_square_footage([(0, 0), (40, 0), (40, 30), (0, 30)])
         self.assertEqual(area, 1200)
-        mix = platform.yard_measurement.detect_surface_mix({"grass": 80, "mulch": 20})
+        mix = platform.yard_measurement.detect_surface_mix({"grass": 80, "mulch": 20, "pool": 100})
         self.assertEqual(set(mix.keys()), {"grass", "mulch", "trees", "driveway"})
+        self.assertEqual(mix["grass"], 40.0)
 
         origin = RouteStop("O", 28.0, -82.0)
         stops = [RouteStop("A", 28.01, -82.01), RouteStop("B", 28.5, -82.5)]

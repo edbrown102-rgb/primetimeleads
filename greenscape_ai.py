@@ -139,8 +139,7 @@ class BillingService:
     def next_recurring_invoice_date(self, invoice: Invoice) -> date | None:
         if invoice.recurring_interval_days is None:
             return None
-        anchor_date = invoice.paid_at or invoice.due_date
-        return anchor_date + timedelta(days=invoice.recurring_interval_days)
+        return invoice.due_date + timedelta(days=invoice.recurring_interval_days)
 
 
 # ---------- Customer Portal ----------
@@ -164,7 +163,7 @@ class CustomerPortalService:
         if self.terms_service is None:
             return f"rejected:{proposal.id}"
         expected_signature = self.terms_service.sign(proposal.customer_id, proposal.terms)
-        if customer_signature.strip() != expected_signature:
+        if not hmac.compare_digest(customer_signature.strip(), expected_signature):
             return f"rejected:{proposal.id}"
         return f"approved:{proposal.id}:{expected_signature}"
 
@@ -226,7 +225,7 @@ class YardMeasurementService:
     def detect_surface_mix(self, classified_pixels: Dict[str, int]) -> Dict[str, float]:
         categories = ("grass", "mulch", "trees", "driveway")
         counts = {category: max(classified_pixels.get(category, 0), 0) for category in categories}
-        total = sum(counts.values())
+        total = sum(max(v, 0) for v in classified_pixels.values())
         if total <= 0:
             return {category: 0.0 for category in categories}
         return {category: round((count / total) * 100, 2) for category, count in counts.items()}
