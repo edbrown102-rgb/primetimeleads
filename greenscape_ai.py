@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
+import hmac
 from hashlib import sha256
 from math import radians, sin, cos, asin, sqrt, ceil
 from typing import Dict, Iterable, List, Sequence, Tuple
@@ -129,7 +130,7 @@ class BillingService:
         )
 
     def record_payment(self, invoice: Invoice, amount: float) -> bool:
-        if invoice.paid or amount < invoice.amount_due:
+        if invoice.paid or amount <= 0 or amount != invoice.amount_due:
             return False
         invoice.paid = True
         invoice.paid_at = date.today()
@@ -159,7 +160,9 @@ class CustomerPortalService:
         self.service_history: List[str] = []
 
     def approve_proposal(self, proposal: Proposal, customer_signature: str) -> str:
-        return f"approved:{proposal.id}:{customer_signature.strip()}"
+        if customer_signature.strip() != proposal.signature_token:
+            return f"rejected:{proposal.id}"
+        return f"approved:{proposal.id}:{proposal.signature_token}"
 
     def pay_invoice(self, billing: BillingService, invoice: Invoice, amount: float) -> bool:
         return billing.record_payment(invoice, amount)
@@ -245,7 +248,7 @@ class RouteOptimizationService:
         h = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
         return r * 2 * asin(sqrt(h))
 
-    def optimize(self, origin: RouteStop, stops: Sequence[RouteStop]) -> List[RouteStop]:
+    def optimize_nearest_neighbor(self, origin: RouteStop, stops: Sequence[RouteStop]) -> List[RouteStop]:
         unvisited = list(stops)
         route: List[RouteStop] = []
         current = origin
@@ -333,11 +336,15 @@ class TermsAgreementService:
         "recurring_service": "Recurring services renew monthly unless terminated in writing.",
     }
 
+    def __init__(self, signing_secret: str | None = None) -> None:
+        self.signing_secret = (signing_secret or uuid4().hex).encode("utf-8")
+
     def generate_terms(self, agreement_types: Sequence[str]) -> str:
         return "\n".join(self.templates[t] for t in agreement_types if t in self.templates)
 
     def sign(self, customer_id: str, terms: str) -> str:
-        digest = sha256(f"{customer_id}:{terms}".encode("utf-8")).hexdigest()[:12]
+        payload = f"{customer_id}:{terms}".encode("utf-8")
+        digest = hmac.new(self.signing_secret, payload, sha256).hexdigest()[:12]
         return f"sig_{customer_id}_{digest}"
 
 

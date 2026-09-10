@@ -62,7 +62,7 @@ class GreenScapeAITests(unittest.TestCase):
 
         origin = RouteStop("O", 28.0, -82.0)
         stops = [RouteStop("A", 28.01, -82.01), RouteStop("B", 28.5, -82.5)]
-        route = platform.route_optimization.optimize(origin, stops)
+        route = platform.route_optimization.optimize_nearest_neighbor(origin, stops)
         self.assertEqual(route[0].id, "A")
 
         weather = WeatherSnapshot(rain_probability=0.8, heat_index=95, storm_alert=False, rainfall_inches_week=0.6, average_temp_f=80)
@@ -103,6 +103,7 @@ class GreenScapeAITests(unittest.TestCase):
 
     def test_terms_signature_is_deterministic(self):
         platform = GreenScapeAIPlatform()
+        platform.terms.signing_secret = b"test-secret"
         terms = platform.terms.generate_terms(["lawn_care", "weather_delay"])
         sig_a = platform.terms.sign("cust_1", terms)
         sig_b = platform.terms.sign("cust_1", terms)
