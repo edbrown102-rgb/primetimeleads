@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
-from math import radians, sin, cos, asin, sqrt
+from math import radians, sin, cos, asin, sqrt, ceil
 from typing import Dict, Iterable, List, Sequence, Tuple
 from uuid import uuid4
 
@@ -128,7 +128,7 @@ class BillingService:
         )
 
     def record_payment(self, invoice: Invoice, amount: float) -> bool:
-        if amount < invoice.amount_due:
+        if invoice.paid or amount < invoice.amount_due:
             return False
         invoice.paid = True
         return True
@@ -151,6 +151,9 @@ class ServiceRequest:
 
 
 class CustomerPortalService:
+    def __init__(self) -> None:
+        self.service_requests: List[ServiceRequest] = []
+
     def approve_proposal(self, proposal: Proposal, customer_signature: str) -> str:
         return f"approved:{proposal.id}:{customer_signature.strip()}"
 
@@ -158,7 +161,9 @@ class CustomerPortalService:
         return billing.record_payment(invoice, amount)
 
     def request_service(self, customer_id: str, service_type: str, preferred_date: date, notes: str = "") -> ServiceRequest:
-        return ServiceRequest(customer_id=customer_id, service_type=service_type, preferred_date=preferred_date, notes=notes)
+        request = ServiceRequest(customer_id=customer_id, service_type=service_type, preferred_date=preferred_date, notes=notes)
+        self.service_requests.append(request)
+        return request
 
     def view_service_history(self, history: Sequence[str]) -> List[str]:
         return list(history)
@@ -207,10 +212,12 @@ class YardMeasurementService:
         return round(abs(area) / 2.0, 2)
 
     def detect_surface_mix(self, classified_pixels: Dict[str, int]) -> Dict[str, float]:
-        total = sum(classified_pixels.values())
+        categories = ("grass", "mulch", "trees", "driveway")
+        counts = {category: max(classified_pixels.get(category, 0), 0) for category in categories}
+        total = sum(counts.values())
         if total <= 0:
-            return {"grass": 0.0, "mulch": 0.0, "trees": 0.0, "driveway": 0.0}
-        return {k: round((v / total) * 100, 2) for k, v in classified_pixels.items()}
+            return {category: 0.0 for category in categories}
+        return {category: round((count / total) * 100, 2) for category, count in counts.items()}
 
 
 # ---------- Route Assist Optimization ----------
@@ -340,7 +347,9 @@ class EstimationService:
         return round(cubic_feet / 27, 2)
 
     def sod_area_rolls(self, square_feet: float, roll_coverage_sqft: float = 10) -> int:
-        return max(0, int((square_feet + roll_coverage_sqft - 1) // roll_coverage_sqft))
+        if roll_coverage_sqft <= 0 or square_feet <= 0:
+            return 0
+        return max(0, ceil(square_feet / roll_coverage_sqft))
 
     def plant_quantity(self, bed_square_feet: float, spacing_feet: float) -> int:
         if spacing_feet <= 0:

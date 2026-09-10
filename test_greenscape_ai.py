@@ -57,6 +57,8 @@ class GreenScapeAITests(unittest.TestCase):
 
         area = platform.yard_measurement.polygon_square_footage([(0, 0), (40, 0), (40, 30), (0, 30)])
         self.assertEqual(area, 1200)
+        mix = platform.yard_measurement.detect_surface_mix({"grass": 80, "mulch": 20})
+        self.assertEqual(set(mix.keys()), {"grass", "mulch", "trees", "driveway"})
 
         origin = RouteStop("O", 28.0, -82.0)
         stops = [RouteStop("A", 28.01, -82.01), RouteStop("B", 28.5, -82.5)]
@@ -70,6 +72,11 @@ class GreenScapeAITests(unittest.TestCase):
         estimator = EstimationService()
         self.assertEqual(estimator.mulch_cubic_yards(540, 3), 5.0)
         self.assertEqual(estimator.labor_cost(3.5, 45, 2), 315)
+        self.assertEqual(estimator.sod_area_rolls(101, 10.5), 10)
+        self.assertEqual(estimator.sod_area_rolls(101, 0), 0)
+        self.assertEqual(estimator.labor_cost(-1, 45, 2), 0)
+        self.assertEqual(estimator.labor_cost(2, -5, 3), 0)
+        self.assertEqual(estimator.labor_cost(2, 25, -2), 0)
 
     def test_equipment_runtime_and_reminders(self):
         platform = GreenScapeAIPlatform()
@@ -93,6 +100,7 @@ class GreenScapeAITests(unittest.TestCase):
         platform = GreenScapeAIPlatform()
         request = platform.customer_portal.request_service("cust_2", "fertilizer", date.today(), "Backyard only")
         self.assertEqual(request.service_type, "fertilizer")
+        self.assertEqual(len(platform.customer_portal.service_requests), 1)
         history = platform.customer_portal.view_service_history(["Mowing - complete", "Mulch refresh - complete"])
         self.assertEqual(len(history), 2)
 
